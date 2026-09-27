@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        ResumeIQ | AI Resume Analyzer
+    </title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+
+<body>
+
+
+    <!-- =========================================
+         DECORATIVE BACKGROUND
+    ========================================== -->
+
+    <div class="bg-shape bg-shape-one"></div>
+
+    <div class="bg-shape bg-shape-two"></div>
+
+    <div class="bg-shape bg-shape-three"></div>
+
+
+
+    <!-- =========================================
+         NAVIGATION
+    ========================================== -->
+
+    <nav class="navbar">
+
+        <a href="/" class="brand">
+
+            <div class="tt-logo">
+                <span>TT</span>
+            </div>
+
+
+            <div class="brand-text">
+
+                <div class="brand-name">
+                    Resume<span>IQ</span>
+                </div>
+
+
+                <div class="brand-tagline">
+                    AI-powered resume intelligence
+                </div>
+
+            </div>
+
+        </a>
+
+
+        <div class="nav-links">
+
+            <a href="#features">
+                Features
+            </a>
+
+
+            <a href="#how-it-works">
+                How it works
+            </a>
+
+        </div>
+
+    </nav>
+
+
+
+    <main>
+
+
+        <!-- =========================================
+             HERO SECTION
+        ========================================== -->
+
+        <section class="hero">
+
+
+            <div class="hero-content">
+
+
+                <div class="hero-badge">
+
+                    <span>
+                        ✦
+                    </span>
+
+                    AI-Powered Resume Intelligence
+
+                </div>
+
+
+
+                <h1>
+
+                    Make your resume
+
+                    <span>
+                        stand out.
+                    </span>
+
+                </h1>
+
+
+
+                <p class="hero-description">
+
+                    Analyze your resume against a job description,
+                    discover your strengths, and identify the skills
+                    you may be missing.
+
+                </p>
+
+
+            </div>
+
+
+
+            <!-- =====================================
+                 HERO VISUAL
+            ====================================== -->
+
+            <div class="hero-visual">
+
+
+                <div class="resume-illustration">
+
+
+                    <div class="mini-resume">
+
+
+                        <div class="profile-circle">
+                        </div>
+
+
+                        <div class="resume-lines">
+
+                            <span></span>
+
+                            <span></span>
+
+                            <span class="short"></span>
+
+                        </div>
+
+
+                        <div class="resume-section">
+                        </div>
+
+
+                        <div class="resume-bars">
+
+                            <i></i>
+
+                            <i></i>
+
+                            <i></i>
+
+                        </div>
+
+
+                    </div>
+
+
+
+                    <div class="magnifier">
+
+                        <div class="magnifier-glass">
+                        </div>
+
+                        <div class="magnifier-handle">
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="floating-logo">
+
+                        TT
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- Floating badges -->
+
+                <div class="insight-badge badge-match">
+
+                    <span>
+                        ✓
+                    </span>
+
+                    Match Score
+
+                </div>
+
+
+                <div class="insight-badge badge-skills">
+
+                    <span>
+                        ✦
+                    </span>
+
+                    Skills Analysis
+
+                </div>
+
+
+                <div class="insight-badge badge-insights">
+
+                    <span>
+                        💡
+                    </span>
+
+                    Get Insights
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             ANALYZER
+        ========================================== -->
+
+        <section class="analyzer-card">
+
+
+            <form action="/analyze"
+                  method="POST"
+                  enctype="multipart/form-data">
+
+
+                <div class="input-grid">
+
+
+                    <!-- =================================
+                         RESUME UPLOAD
+                    ================================== -->
+
+                    <div class="input-card resume-card">
+
+
+                        <div class="card-header">
+
+
+                            <div class="icon-box purple">
+
+                                ↑
+
+                            </div>
+
+
+                            <div>
+
+                                <h2>
+                                    Upload Your Resume
+                                </h2>
+
+
+                                <p>
+                                    PDF only • Max 10 MB
+                                </p>
+
+                            </div>
+
+
+                        </div>
+
+
+
+                        <label
+                            for="resume"
+                            class="upload-area">
+
+
+                            <div class="upload-icon">
+
+                                ↑
+
+                            </div>
+
+
+                            <h3>
+                                Drop your PDF here
+                            </h3>
+
+
+                            <p>
+                                or click to browse
+                            </p>
+
+
+                        </label>
+
+
+
+                        <input
+                            type="file"
+                            id="resume"
+                            name="resume"
+                            accept=".pdf"
+                            required>
+
+
+                    </div>
+
+
+
+                    <!-- =================================
+                         JOB DESCRIPTION
+                    ================================== -->
+
+                    <div class="input-card job-card">
+
+
+                        <div class="card-header">
+
+
+                            <div class="icon-box mint">
+
+                                ✦
+
+                            </div>
+
+
+                            <div>
+
+                                <h2>
+                                    Job Description
+                                </h2>
+
+
+                                <p>
+                                    Tell us about the role
+                                </p>
+
+                            </div>
+
+
+                        </div>
+
+
+
+                        <textarea
+                            id="job_description"
+                            name="job_description"
+                            placeholder="Paste the job description here...
+
+Example:
+We are looking for a Python Developer with experience in Flask, SQL, machine learning and REST APIs..."
+                            required></textarea>
+
+
+
+                        <div class="character-hint">
+
+                            Paste the complete job description
+                            for better analysis.
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- =====================================
+                     ANALYZE BUTTON
+                ====================================== -->
+
+                <button
+                    type="submit"
+                    class="analyze-button">
+
+
+                    <span>
+                        ✦
+                    </span>
+
+
+                    Analyze My Resume
+
+
+                    <span class="arrow">
+                        →
+                    </span>
+
+
+                </button>
+
+
+            </form>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             FEATURES
+        ========================================== -->
+
+        <section
+            id="features"
+            class="features">
+
+
+            <div class="feature">
+
+
+                <div class="feature-icon pink">
+
+                    🎯
+
+                </div>
+
+
+                <h3>
+                    Match Score
+                </h3>
+
+
+                <p>
+
+                    See how closely your resume
+                    matches the role.
+
+                </p>
+
+
+            </div>
+
+
+
+            <div class="feature">
+
+
+                <div class="feature-icon yellow">
+
+                    🧠
+
+                </div>
+
+
+                <h3>
+                    Skill Intelligence
+                </h3>
+
+
+                <p>
+
+                    Identify relevant and missing
+                    skills automatically.
+
+                </p>
+
+
+            </div>
+
+
+
+            <div class="feature">
+
+
+                <div class="feature-icon green">
+
+                    📊
+
+                </div>
+
+
+                <h3>
+                    Actionable Insights
+                </h3>
+
+
+                <p>
+
+                    Understand where your resume
+                    can be improved.
+
+                </p>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             HOW IT WORKS
+        ========================================== -->
+
+        <section
+            id="how-it-works"
+            class="how-it-works">
+
+
+            <div class="section-heading">
+
+
+                <div class="hero-badge">
+
+                    ✦ How it works
+
+                </div>
+
+
+                <h2>
+                    From resume to insights.
+                </h2>
+
+
+                <p>
+                    ResumeIQ analyzes your resume
+                    in a few simple steps.
+                </p>
+
+
+            </div>
+
+
+
+            <div class="steps-grid">
+
+
+                <div class="step-card">
+
+
+                    <div class="step-number">
+                        01
+                    </div>
+
+
+                    <h3>
+                        Upload
+                    </h3>
+
+
+                    <p>
+                        Upload your resume as a PDF.
+                    </p>
+
+
+                </div>
+
+
+
+                <div class="step-card">
+
+
+                    <div class="step-number">
+                        02
+                    </div>
+
+
+                    <h3>
+                        Compare
+                    </h3>
+
+
+                    <p>
+                        Add the job description
+                        you want to analyze.
+                    </p>
+
+
+                </div>
+
+
+
+                <div class="step-card">
+
+
+                    <div class="step-number">
+                        03
+                    </div>
+
+
+                    <h3>
+                        Analyze
+                    </h3>
+
+
+                    <p>
+                        ResumeIQ compares skills
+                        and text similarity.
+                    </p>
+
+
+                </div>
+
+
+
+                <div class="step-card">
+
+
+                    <div class="step-number">
+                        04
+                    </div>
+
+
+                    <h3>
+                        Improve
+                    </h3>
+
+
+                    <p>
+                        Review strengths, gaps,
+                        and suggestions.
+                    </p>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- =========================================
+         FOOTER
+    ========================================== -->
+
+    <footer>
+
+        <p>
+
+            Built with
+
+            <span>
+                Python
+            </span>
+
+            •
+
+            <span>
+                Flask
+            </span>
+
+            •
+
+            <span>
+                NLP
+            </span>
+
+            •
+
+            <span>
+                Machine Learning
+            </span>
+
+        </p>
+
+    </footer>
+
+
+</body>
+
+</html>

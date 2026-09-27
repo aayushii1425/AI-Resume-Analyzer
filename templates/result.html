@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        ResumeIQ | Analysis Results
+    </title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+
+<body>
+
+
+    <!-- =========================================
+         NAVIGATION
+    ========================================== -->
+
+    <nav class="navbar">
+
+
+        <a href="/" class="brand">
+
+
+            <div class="tt-logo">
+
+                <span>
+                    TT
+                </span>
+
+            </div>
+
+
+            <div class="brand-text">
+
+
+                <div class="brand-name">
+
+                    Resume<span>
+                        IQ
+                    </span>
+
+                </div>
+
+
+                <div class="brand-tagline">
+
+                    AI-powered resume intelligence
+
+                </div>
+
+
+            </div>
+
+
+        </a>
+
+
+
+        <div class="nav-links">
+
+
+            <a href="/">
+
+                Analyze Again
+
+            </a>
+
+
+        </div>
+
+
+    </nav>
+
+
+
+    <!-- =========================================
+         BACKGROUND
+    ========================================== -->
+
+    <div class="bg-shape bg-shape-one"></div>
+
+    <div class="bg-shape bg-shape-two"></div>
+
+    <div class="bg-shape bg-shape-three"></div>
+
+
+
+    <main>
+
+
+        <!-- =========================================
+             HERO
+        ========================================== -->
+
+        <section class="hero results-hero">
+
+
+            <div class="hero-badge">
+
+                ✨ Analysis Complete
+
+            </div>
+
+
+
+            <h1>
+
+                Your resume
+
+                <span>
+                    insights.
+                </span>
+
+            </h1>
+
+
+
+            <p class="hero-description">
+
+                Here's how your resume compares
+                with the job description.
+
+            </p>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             SCORE
+        ========================================== -->
+
+        <section class="results-card">
+
+
+            <div class="result-header">
+
+
+                <div>
+
+
+                    <p class="result-label">
+
+                        Resume Match
+
+                    </p>
+
+
+
+                    <h2>
+
+                        {{ similarity_score }}%
+
+                    </h2>
+
+
+
+                    <p>
+
+                        Text similarity between your
+                        resume and the job description.
+
+                    </p>
+
+
+
+                    <!-- Keyword Coverage -->
+
+                    <div class="coverage-box">
+
+
+                        <div class="coverage-label">
+
+                            Job Keyword Coverage
+
+                        </div>
+
+
+
+                        <div class="coverage-value">
+
+                            {{ keyword_coverage }}%
+
+                        </div>
+
+
+
+                        <div class="coverage-description">
+
+                            Percentage of detected job
+                            skills found in your resume.
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             MATCHED + MISSING SKILLS
+        ========================================== -->
+
+        <section class="skills-grid">
+
+
+            <!-- MATCHED -->
+
+            <div class="skills-card matched">
+
+
+                <div class="card-header">
+
+
+                    <div class="icon-box green">
+
+                        ✓
+
+                    </div>
+
+
+                    <div>
+
+
+                        <h2>
+                            Matched Skills
+                        </h2>
+
+
+                        <p>
+                            Skills found in both documents
+                        </p>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <div class="skill-list">
+
+
+                    {% if matched_skills %}
+
+
+                        {% for skill in matched_skills %}
+
+
+                            <span class="skill-tag">
+
+                                {{ skill.title() }}
+
+                            </span>
+
+
+                        {% endfor %}
+
+
+                    {% else %}
+
+
+                        <p>
+                            No matching skills detected.
+                        </p>
+
+
+                    {% endif %}
+
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- MISSING -->
+
+            <div class="skills-card missing">
+
+
+                <div class="card-header">
+
+
+                    <div class="icon-box pink">
+
+                        !
+
+                    </div>
+
+
+                    <div>
+
+
+                        <h2>
+                            Missing Skills
+                        </h2>
+
+
+                        <p>
+                            Job skills not detected
+                            in your resume
+                        </p>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <div class="skill-list">
+
+
+                    {% if missing_skills %}
+
+
+                        {% for skill in missing_skills %}
+
+
+                            <span class="skill-tag">
+
+                                {{ skill.title() }}
+
+                            </span>
+
+
+                        {% endfor %}
+
+
+                    {% else %}
+
+
+                        <p>
+                            No detected skills are missing.
+                        </p>
+
+
+                    {% endif %}
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             SKILL ANALYSIS
+        ========================================== -->
+
+        <section class="results-card">
+
+
+            <div class="card-header">
+
+
+                <div class="icon-box purple">
+
+                    ✦
+
+                </div>
+
+
+                <div>
+
+
+                    <h2>
+                        Skill Analysis
+                    </h2>
+
+
+                    <p>
+
+                        Skills detected from your resume
+                        and the job description.
+
+                    </p>
+
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="analysis-stats">
+
+
+                <div>
+
+                    <strong>
+                        {{ resume_skills|length }}
+                    </strong>
+
+                    <span>
+                        Resume Skills
+                    </span>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        {{ job_skills|length }}
+                    </strong>
+
+                    <span>
+                        Job Skills
+                    </span>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        {{ matched_skills|length }}
+                    </strong>
+
+                    <span>
+                        Matched
+                    </span>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        {{ missing_skills|length }}
+                    </strong>
+
+                    <span>
+                        Missing
+                    </span>
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             VISUAL ANALYSIS
+        ========================================== -->
+
+        <section class="visual-analysis">
+
+
+            <div class="visual-header">
+
+
+                <div class="icon-box purple">
+
+                    📊
+
+                </div>
+
+
+                <div>
+
+
+                    <h2>
+                        Visual Skill Analysis
+                    </h2>
+
+
+                    <p>
+                        A visual breakdown of your resume
+                        against the job requirements.
+                    </p>
+
+
+                </div>
+
+
+            </div>
+            <section class="ats-section">
+
+    <div class="section-heading">
+
+        <div class="hero-badge">
+            ✦ ATS-Style Resume Checks
+        </div>
+
+        <h2>
+            Resume Readiness
+        </h2>
+
+        <p>
+            A quick check of important resume elements
+            that can improve readability and completeness.
+        </p>
+
+    </div>
+
+
+    <div class="ats-layout">
+
+        <!-- ATS SCORE -->
+
+        <div class="ats-score-card">
+
+            <div
+                class="percentage-circle ats-circle"
+                style="--percentage: {{ ats_score }};"
+            >
+
+                <span>
+                    {{ ats_score }}%
+                </span>
+
+            </div>
+
+            <h3>
+                Resume Readiness
+            </h3>
+
+            <p>
+                Based on the detected resume elements.
+            </p>
+
+        </div>
+
+
+        <!-- CHECKS -->
+
+        <div class="ats-checks">
+
+            {% for check in ats_results.checks %}
+
+            <div class="ats-check">
+
+                <div
+                    class="ats-status
+                    {% if check.status %}
+                        success
+                    {% else %}
+                        warning
+                    {% endif %}"
+                >
+
+                    {% if check.status %}
+                        ✓
+                    {% else %}
+                        !
+                    {% endif %}
+
+                </div>
+
+
+                <div class="ats-check-content">
+
+                    <h3>
+                        {{ check.name }}
+                    </h3>
+
+                    <p>
+                        {{ check.message }}
+                    </p>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+
+    <div class="ats-note">
+
+        <strong>Note:</strong>
+
+        This is an automated resume-readiness check,
+        not a guarantee that a resume will pass any
+        particular Applicant Tracking System.
+
+    </div>
+
+</section>
+
+
+
+            <!-- =====================================
+                 SKILL BAR CHART
+            ====================================== -->
+
+            <div class="skill-bars">
+
+
+                <!-- Resume Skills -->
+
+                <div class="skill-bar-row">
+
+
+                    <div class="bar-label">
+
+
+                        <span>
+                            Resume Skills
+                        </span>
+
+
+                        <strong>
+                            {{ resume_skills|length }}
+                        </strong>
+
+
+                    </div>
+
+
+                    <div class="bar-track">
+
+
+                        <div
+                            class="bar-fill resume-bar"
+                            style="width:
+                            {{ (resume_skills|length /
+                            (job_skills|length if job_skills|length > 0 else 1) * 100)
+                            if resume_skills|length < job_skills|length
+                            else 100 }}%;">
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- Job Skills -->
+
+                <div class="skill-bar-row">
+
+
+                    <div class="bar-label">
+
+
+                        <span>
+                            Job Skills
+                        </span>
+
+
+                        <strong>
+                            {{ job_skills|length }}
+                        </strong>
+
+
+                    </div>
+
+
+                    <div class="bar-track">
+
+
+                        <div
+                            class="bar-fill job-bar"
+                            style="width: 100%;">
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- Matched Skills -->
+
+                <div class="skill-bar-row">
+
+
+                    <div class="bar-label">
+
+
+                        <span>
+                            Matched Skills
+                        </span>
+
+
+                        <strong>
+                            {{ matched_skills|length }}
+                        </strong>
+
+
+                    </div>
+
+
+                    <div class="bar-track">
+
+
+                        <div
+                            class="bar-fill matched-bar"
+                            style="width:
+                            {{ (matched_skills|length /
+                            (job_skills|length if job_skills|length > 0 else 1) * 100) }}%;">
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- Missing Skills -->
+
+                <div class="skill-bar-row">
+
+
+                    <div class="bar-label">
+
+
+                        <span>
+                            Missing Skills
+                        </span>
+
+
+                        <strong>
+                            {{ missing_skills|length }}
+                        </strong>
+
+
+                    </div>
+
+
+                    <div class="bar-track">
+
+
+                        <div
+                            class="bar-fill missing-bar"
+                            style="width:
+                            {{ (missing_skills|length /
+                            (job_skills|length if job_skills|length > 0 else 1) * 100) }}%;">
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- =====================================
+                 CIRCULAR CHARTS
+            ====================================== -->
+
+            <div class="percentage-grid">
+
+
+                <!-- Resume Match -->
+
+                <div class="percentage-card">
+
+
+                    <div
+                        class="percentage-circle"
+                        style="--percentage: {{ similarity_score }};"
+                    >
+
+
+                        <span>
+                            {{ similarity_score }}%
+                        </span>
+
+
+                    </div>
+
+
+                    <h3>
+                        Resume Match
+                    </h3>
+
+
+                    <p>
+                        Text similarity between your
+                        resume and the job description.
+                    </p>
+
+
+                </div>
+
+
+
+                <!-- Keyword Coverage -->
+
+                <div class="percentage-card">
+
+
+                    <div
+                        class="percentage-circle coverage-circle"
+                        style="--percentage: {{ keyword_coverage }};"
+                    >
+
+
+                        <span>
+                            {{ keyword_coverage }}%
+                        </span>
+
+
+                    </div>
+
+
+                    <h3>
+                        Keyword Coverage
+                    </h3>
+
+
+                    <p>
+                        Detected job skills that
+                        appear in your resume.
+                    </p>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =========================================
+             RESUME INSIGHTS
+        ========================================== -->
+
+        <section class="insights-grid">
+
+
+            <!-- STRENGTHS -->
+
+            <div class="insight-card strengths-card">
+
+
+                <div class="card-header">
+
+
+                    <div class="icon-box green">
+
+                        ✓
+
+                    </div>
+
+
+                    <div>
+
+
+                        <h2>
+                            Resume Strengths
+                        </h2>
+
+
+                        <p>
+                            Positive signals detected
+                            in your resume.
+                        </p>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <div class="insight-list">
+
+
+                    {% for strength in strengths %}
+
+
+                        <div class="insight-item">
+
+
+                            <span class="insight-check">
+
+                                ✓
+
+                            </span>
+
+
+                            <span>
+
+                                {{ strength }}
+
+                            </span>
+
+
+                        </div>
+
+
+                    {% endfor %}
+
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- SUGGESTIONS -->
+
+            <div class="insight-card suggestions-card">
+
+
+                <div class="card-header">
+
+
+                    <div class="icon-box pink">
+
+                        !
+
+                    </div>
+
+
+                    <div>
+
+
+                        <h2>
+                            Areas to Improve
+                        </h2>
+
+
+                        <p>
+                            Suggestions based on
+                            the job description.
+                        </p>
+
+
+                    </div>
+
+
+                </div>
+
+
+
+                <div class="insight-list">
+
+
+                    {% for suggestion in suggestions %}
+
+
+                        <div class="insight-item">
+
+
+                            <span class="insight-warning">
+
+                                !
+
+                            </span>
+
+
+                            <span>
+
+                                {{ suggestion }}
+
+                            </span>
+
+
+                        </div>
+
+
+                    {% endfor %}
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+<div class="report-download-section">
+
+    <div class="report-download-content">
+
+        <div class="report-icon">
+            📄
+        </div>
+
+        <div>
+            <h3>
+                Save Your Analysis
+            </h3>
+
+            <p>
+                Download a detailed PDF report containing
+                your resume analysis, skills, readiness
+                checks, strengths, and suggestions.
+            </p>
+        </div>
+
+    </div>
+
+
+    <a
+        href="/download-report"
+        class="download-report-button"
+    >
+        <span>↓</span>
+        Download Analysis Report
+    </a>
+
+</div>
+
+        <!-- =========================================
+             ANALYZE ANOTHER RESUME
+        ========================================== -->
+
+        <div class="back-button-container">
+
+
+            <a href="/"
+               class="analyze-button">
+
+
+                <span>
+                    ↻
+                </span>
+
+
+                Analyze Another Resume
+
+
+                <span class="arrow">
+                    →
+                </span>
+
+
+            </a>
+
+
+        </div>
+
+
+    </main>
+
+
+
+    <!-- =========================================
+         FOOTER
+    ========================================== -->
+
+    <footer>
+
+
+        <p>
+
+            Built with
+
+            <span>
+                Python
+            </span>
+
+            •
+
+            <span>
+                Flask
+            </span>
+
+            •
+
+            <span>
+                NLP
+            </span>
+
+            •
+
+            <span>
+                Machine Learning
+            </span>
+
+        </p>
+
+
+    </footer>
+
+
+</body>
+
+</html>

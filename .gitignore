@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+.env.*
+
+# VS Code
+.vscode/
+
+# Flask
+instance/
+
+# Generated PDF reports
+*.pdf
+
+# OS files
+.DS_Store
+Thumbs.db
