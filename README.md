@@ -1,5 +1,9 @@
 # ResumeIQ — AI Resume Analyzer
 
+🚀 **Live Demo:** [Launch ResumeIQ](https://ai-resume-analyzer-4322.onrender.com/)
+
+📂 **GitHub Repository:** [AI-Resume-Analyzer](https://github.com/aayushii1425/AI-Resume-Analyzer)
+
 ResumeIQ is an AI-powered web application that analyzes resumes against job descriptions and provides insights into resume-job alignment, skills, keyword coverage, and resume readiness.
 
 The application extracts information from PDF resumes, identifies relevant technical skills, compares them with job requirements, and generates an automated analysis report.
