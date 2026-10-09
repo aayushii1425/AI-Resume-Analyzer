@@ -29,6 +29,8 @@ Online AI Mode: Use the Gemini API for AI-powered assistance.
 
 Offline AI Mode: Use Ollama with a locally installed language model.
 
+
+
 🧠 **Technology Stack**
 
 Backend: Python, Flask
@@ -45,7 +47,8 @@ Offline LLM: Ollama with a local model such as Qwen 2.5 7B
 
 Planned RAG Framework: LangChain
 
-Planned Vector Storage: FAISS or Chroma
+Planned Vector Storage: FAISS
+
 
 🔄 **Planned RAG Architecture**
 
@@ -67,15 +70,17 @@ Generating contextual responses using Gemini online or Ollama offline.
 
 ⚙️ **AI Modes**
 
-<u>Online Mode</u>
+<p><ins>Online Mode</ins></p>
 
 Uses the Gemini API and requires a valid API key configured securely in the environment.
 
-<u>Offline Mode</u>
+<p><ins>Offline Mode</ins></p>
 
 Uses Ollama and a locally installed language model. Ollama and the required model must be installed on the computer running the application.
 
 Note: Offline inference on your computer is separate from the Render-hosted deployment. The deployed website does not automatically have access to your local Ollama installation.
+
+
 
 💻 **Local Setup**
 
@@ -110,6 +115,8 @@ Open http://127.0.0.1:5000 in your browser.
 👩‍💻 **Project Goal**
 
 ResumeIQ aims to make resume evaluation more accessible by combining job-description matching, actionable feedback, and AI-powered resume assistance in one application.
+
+
 
 📌 **Future Enhancements**
 
