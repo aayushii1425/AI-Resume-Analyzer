@@ -1,6 +1,6 @@
 # ResumeIQ — AI Resume Analyzer
 
-🚀 **Live Demo:** [Launch ResumeIQ](https://ai-resume-analyzer-4322.onrender.com/analyze)
+🚀 **Live Demo:** [Launch ResumeIQ](https://ai-resume-analyzer-4322.onrender.com/)
 
 📂 **GitHub Repository:** [AI-Resume-Analyzer](https://github.com/aayushii1425/AI-Resume-Analyzer)
 
