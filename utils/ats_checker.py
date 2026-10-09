@@ -2,17 +2,36 @@ import re
 
 
 def check_ats_requirements(text):
+
     text_lower = text.lower()
 
     checks = []
 
-    # -----------------------------------------
-    # EMAIL CHECK
-    # -----------------------------------------
+    # --------------------------------------------------
+    # NORMALIZE PDF EXTRACTED TEXT
+    # --------------------------------------------------
 
-    email_pattern = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+    normalized_text = re.sub(
+        r"\s+",
+        " ",
+        text
+    ).strip()
 
-    email_found = re.search(email_pattern, text)
+    normalized_lower = normalized_text.lower()
+
+    # --------------------------------------------------
+    # EMAIL
+    # --------------------------------------------------
+
+    email_pattern = (
+        r"[A-Za-z0-9._%+-]+\s*@\s*"
+        r"[A-Za-z0-9.-]+\s*\.\s*[A-Za-z]{2,}"
+    )
+
+    email_found = re.search(
+        email_pattern,
+        normalized_text
+    )
 
     checks.append({
         "name": "Email Address",
@@ -24,13 +43,19 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
-    # PHONE CHECK
-    # -----------------------------------------
+    # --------------------------------------------------
+    # PHONE
+    # --------------------------------------------------
 
-    phone_pattern = r"(\+?\d{1,3}[-.\s]?)?\d{10}"
+    phone_pattern = (
+        r"(?:\+?\d{1,3}[\s.-]?)?"
+        r"(?:\d[\s.-]?){10}"
+    )
 
-    phone_found = re.search(phone_pattern, text)
+    phone_found = re.search(
+        phone_pattern,
+        normalized_text
+    )
 
     checks.append({
         "name": "Phone Number",
@@ -42,9 +67,9 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
+    # --------------------------------------------------
     # EDUCATION
-    # -----------------------------------------
+    # --------------------------------------------------
 
     education_keywords = [
         "education",
@@ -53,11 +78,17 @@ def check_ats_requirements(text):
         "college",
         "degree",
         "bachelor",
-        "master"
+        "master",
+        "b.tech",
+        "m.tech",
+        "b.e.",
+        "m.e.",
+        "undergraduate",
+        "postgraduate"
     ]
 
     education_found = any(
-        keyword in text_lower
+        keyword in normalized_lower
         for keyword in education_keywords
     )
 
@@ -71,20 +102,22 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
+    # --------------------------------------------------
     # EXPERIENCE
-    # -----------------------------------------
+    # --------------------------------------------------
 
     experience_keywords = [
         "experience",
         "work experience",
         "professional experience",
         "internship",
-        "employment"
+        "internships",
+        "employment",
+        "work history"
     ]
 
     experience_found = any(
-        keyword in text_lower
+        keyword in normalized_lower
         for keyword in experience_keywords
     )
 
@@ -98,18 +131,20 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
+    # --------------------------------------------------
     # PROJECTS
-    # -----------------------------------------
+    # --------------------------------------------------
 
     project_keywords = [
         "projects",
         "project",
-        "portfolio"
+        "portfolio",
+        "personal projects",
+        "academic projects"
     ]
 
     projects_found = any(
-        keyword in text_lower
+        keyword in normalized_lower
         for keyword in project_keywords
     )
 
@@ -123,19 +158,21 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
+    # --------------------------------------------------
     # SKILLS
-    # -----------------------------------------
+    # --------------------------------------------------
 
     skills_keywords = [
         "skills",
         "technical skills",
+        "technical expertise",
         "technologies",
-        "technical expertise"
+        "technical proficiencies",
+        "core competencies"
     ]
 
     skills_found = any(
-        keyword in text_lower
+        keyword in normalized_lower
         for keyword in skills_keywords
     )
 
@@ -149,15 +186,17 @@ def check_ats_requirements(text):
         )
     })
 
-    # -----------------------------------------
-    # RESUME LENGTH
-    # -----------------------------------------
+    # --------------------------------------------------
+    # RESUME CONTENT
+    # --------------------------------------------------
 
-    word_count = len(text.split())
+    word_count = len(normalized_text.split())
 
     if word_count >= 150:
         length_status = True
-        length_message = f"Resume contains approximately {word_count} words."
+        length_message = (
+            f"Resume contains approximately {word_count} words."
+        )
     else:
         length_status = False
         length_message = (
@@ -171,12 +210,13 @@ def check_ats_requirements(text):
         "message": length_message
     })
 
-    # -----------------------------------------
-    # ATS SCORE
-    # -----------------------------------------
+    # --------------------------------------------------
+    # READINESS SCORE
+    # --------------------------------------------------
 
     passed_checks = sum(
-        1 for check in checks
+        1
+        for check in checks
         if check["status"]
     )
 

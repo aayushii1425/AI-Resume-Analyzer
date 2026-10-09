@@ -1,10 +1,10 @@
-import fitz
+import pymupdf
 
 
 def extract_text_from_pdf(pdf_file):
     pdf_bytes = pdf_file.read()
 
-    document = fitz.open(
+    document = pymupdf.open(
         stream=pdf_bytes,
         filetype="pdf"
     )
