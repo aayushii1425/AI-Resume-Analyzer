@@ -1,6 +1,6 @@
 # ResumeIQ — AI Resume Analyzer
 
-🚀 **Live Demo:** [Launch ResumeIQ](https://ai-resume-analyzer-4322.onrender.com/)
+🚀 **Live Demo:** [Launch ResumeIQ](https://ai-resume-analyzer-4322.onrender.com/analyze)
 
 📂 **GitHub Repository:** [AI-Resume-Analyzer](https://github.com/aayushii1425/AI-Resume-Analyzer)
 
@@ -9,72 +9,117 @@ ResumeIQ is an AI-powered web application that analyzes resumes against job desc
 The application extracts information from PDF resumes, identifies relevant technical skills, compares them with job requirements, and generates an automated analysis report.
 
 ---
+✨ Features
 
-## ✨ Features
+Resume Parsing: Extract text from uploaded PDF resumes.
 
-- 📄 PDF resume upload
-- 🔍 Resume text extraction
-- 🧠 Automatic skill extraction
-- 🎯 Resume–job description similarity analysis
-- 📊 Keyword coverage analysis
-- ✅ Matched skills identification
-- ⚠️ Missing skills identification
-- 📋 Resume readiness checks
-- 💡 Resume strengths and improvement suggestions
-- 📈 Visual skill analysis
-- 📥 Downloadable PDF analysis report
-- 🎨 Modern responsive user interface
+Job Description Matching: Compare resumes with job descriptions using TF-IDF and cosine similarity.
 
----
+Skill Gap Analysis: Identify matching and missing skills.
 
-## 🛠️ Technologies Used
+ATS-Style Checks: Evaluate resume structure and common application-readiness factors.
 
-### Backend
-- Python
-- Flask
+Improvement Suggestions: Highlight resume strengths and areas for improvement.
 
-### Natural Language Processing & Machine Learning
-- Scikit-learn
-- TF-IDF Vectorization
-- Cosine Similarity
-- Regular Expressions
+PDF Report: Download the resume analysis report.
 
-### PDF Processing
-- PyMuPDF
+AI Support Chatbot: Ask questions about resume weaknesses, missing skills, and improvement strategies.
 
-### Report Generation
-- ReportLab
+Online AI Mode: Use the Gemini API for AI-powered assistance.
 
-### Frontend
-- HTML5
-- CSS3
-- Jinja2
+Offline AI Mode: Use Ollama with a locally installed language model.
 
-### Deployment
-- Gunicorn
-- Render
+🧠 Technology Stack
 
----
+Backend: Python, Flask
 
-## 🔄 How It Works
+Frontend: HTML, CSS, JavaScript
 
-```text
-Upload Resume
-      ↓
-Extract PDF Text
-      ↓
-Preprocess Resume & Job Description
-      ↓
-Extract Relevant Skills
-      ↓
-Compare Resume with Job Description
-      ↓
-Calculate Similarity & Keyword Coverage
-      ↓
-Run Resume Readiness Checks
-      ↓
-Generate Strengths & Suggestions
-      ↓
-Display Visual Results
-      ↓
-Download PDF Report
+NLP and Matching: TF-IDF, cosine similarity
+
+PDF Processing: Python PDF extraction utilities
+
+Online LLM: Google Gemini API
+
+Offline LLM: Ollama with a local model such as Qwen 2.5 7B
+
+Planned RAG Framework: LangChain
+
+Planned Vector Storage: FAISS or Chroma
+
+🔄 Planned RAG Architecture
+
+The planned Retrieval-Augmented Generation (RAG) pipeline consists of:
+
+Extracting text from uploaded resumes.
+
+Splitting text into manageable chunks.
+
+Generating embeddings for the chunks.
+
+Storing embeddings in a vector database.
+
+Retrieving relevant resume information based on user queries.
+
+Using LangChain to coordinate retrieval, prompt construction, and LLM interaction.
+
+Generating contextual responses using Gemini online or Ollama offline.
+
+⚙️ AI Modes
+
+Online Mode
+
+Uses the Gemini API and requires a valid API key configured securely in the environment.
+
+Offline Mode
+
+Uses Ollama and a locally installed language model. Ollama and the required model must be installed on the computer running the application.
+
+Note: Offline inference on your computer is separate from the Render-hosted deployment. The deployed website does not automatically have access to your local Ollama installation.
+
+💻 Local Setup
+
+Clone the repository:
+
+git clone https://github.com/aayushii1425/AI-Resume-Analyzer.git
+
+Enter the project directory:
+
+cd AI-Resume-Analyzer
+
+Create and activate a virtual environment:
+
+python -m venv .venv
+.venv\Scripts\activate
+
+Install dependencies:
+
+pip install -r requirements.txt
+
+Configure the Gemini API key using an environment variable if you want online AI functionality.
+
+For offline mode, install Ollama and download the required model.
+
+Start the Flask application:
+
+python app.py
+
+Open http://127.0.0.1:5000 in your browser.
+
+🔐 Security
+
+Keep API keys in environment variables. Never commit API keys or other secrets to GitHub.
+
+👩‍💻 Project Goal
+
+ResumeIQ aims to make resume evaluation more accessible by combining job-description matching, actionable feedback, and AI-powered resume assistance in one application.
+
+📌 Future Enhancements
+
+Complete the LangChain-based RAG pipeline.
+
+Integrate FAISS or Chroma for semantic retrieval.
+
+Improve contextual resume question answering.
+
+Expand resume evaluation and job-specific recommendations.
