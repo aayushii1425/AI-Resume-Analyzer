@@ -31,7 +31,7 @@ if API_KEY:
 # Use one fast model to avoid delays from sequential fallback attempts.
 # If this model is unavailable for your API account, choose a supported
 # Flash model from Google's AI Studio model list.
-PRIMARY_MODEL = "gemini-2.5-flash"
+PRIMARY_MODEL = "gemini-3.8-flash"
 
 MAX_RESUME_CHARS = 3000
 MAX_JOB_CHARS = 1800

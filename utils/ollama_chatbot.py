@@ -1,13 +1,12 @@
 
 from ollama import chat
 
-MODEL_NAME = "qwen2.5:7b"
+MODEL_NAME = "qwen2.5:3b"
 
-# Speed-focused defaults. Actual speed depends on your hardware.
 MAX_HISTORY_MESSAGES = 4
-MAX_RESPONSE_TOKENS = 180
-MAX_RESUME_CHARS = 4000
-MAX_JOB_CHARS = 2000
+MAX_RESUME_CHARS = 2500
+MAX_JOB_CHARS = 1200
+MAX_RESPONSE_TOKENS = 120
 
 
 def get_ollama_chat_response(
@@ -29,43 +28,41 @@ def get_ollama_chat_response(
     suggestions = suggestions or []
     chat_history = chat_history or []
 
-    # Limit context to reduce prompt-processing time.
-    resume_context = (resume_text or "")[:MAX_RESUME_CHARS]
-    job_context = (job_description or "")[:MAX_JOB_CHARS]
+    # Keep the context small to reduce processing time.
+    resume_text = (resume_text or "")[:MAX_RESUME_CHARS]
+    job_description = (job_description or "")[:MAX_JOB_CHARS]
 
     system_prompt = f"""
-You are ResumeIQ, a concise and practical resume and career assistant.
-Always reply in English only. Never reply in Hindi or Chinese.
+You are ResumeIQ, a concise AI resume and career assistant.
 
-Help users improve their resumes for the provided job description.
-Use the supplied analysis data when relevant.
-Never invent skills, experience, education, projects, or achievements.
-An ATS-style score is an estimate, not a guarantee of passing a real ATS.
+Rules:
+- Reply in English.
+- Answer the user's question directly.
+- Give short, practical answers.
+- Use bullet points when useful.
+- For resume advice, use the provided analysis.
+- Never invent skills or resume details.
+- If information is missing, say so.
 
-Keep answers direct, helpful, and easy to understand.
-Prefer short paragraphs or up to 4 bullet points.
-Answer the exact question first. Avoid repeating the entire resume.
-If the user asks for detailed guidance, provide more detail.
+Resume:
+{resume_text}
 
-RESUME (may be truncated):
-{resume_context}
+Job description:
+{job_description}
 
-JOB DESCRIPTION (may be truncated):
-{job_context}
+Similarity score: {similarity_score}
+Keyword coverage: {keyword_coverage}
+ATS score: {ats_score}
+Matched skills: {", ".join(map(str, matched_skills[:12]))}
+Missing skills: {", ".join(map(str, missing_skills[:12]))}
+Strengths: {"; ".join(map(str, strengths[:4]))}
+Suggestions: {"; ".join(map(str, suggestions[:4]))}
 
-ANALYSIS:
-Resume match: {similarity_score}%
-Keyword coverage: {keyword_coverage}%
-ATS-style readiness: {ats_score}%
-Matched skills: {", ".join(map(str, matched_skills[:30]))}
-Missing skills: {", ".join(map(str, missing_skills[:30]))}
-Strengths: {", ".join(map(str, strengths[:8]))}
-Suggestions: {", ".join(map(str, suggestions[:8]))}
-""".strip()
+Keep responses focused and normally under 100 words.
+"""
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Keep only recent, valid conversation messages.
     for item in chat_history[-MAX_HISTORY_MESSAGES:]:
         if not isinstance(item, dict):
             continue
@@ -73,19 +70,15 @@ Suggestions: {", ".join(map(str, suggestions[:8]))}
         role = item.get("role")
         content = item.get("content", "")
 
-        if role not in ("user", "assistant") or not isinstance(content, str):
-            continue
-
-        content = content.strip()
-        if content:
+        if role in ("user", "assistant") and content:
             messages.append({
                 "role": role,
-                "content": content[:1500],
+                "content": str(content)[:800],
             })
 
     messages.append({
         "role": "user",
-        "content": str(user_message)[:2000],
+        "content": str(user_message)[:1200],
     })
 
     response = chat(
@@ -94,12 +87,10 @@ Suggestions: {", ".join(map(str, suggestions[:8]))}
         stream=False,
         keep_alive="10m",
         options={
-            "temperature": 0.3,
+            "temperature": 0.2,
             "num_predict": MAX_RESPONSE_TOKENS,
             "num_ctx": 4096,
         },
     )
 
-    # Compatible with Ollama response objects and dictionary-like responses.
-    message = response["message"]
-    return message["content"].strip()
+    return response["message"]["content"].strip()
