@@ -1,59 +1,49 @@
-from dotenv import load_dotenv
-import os
 
+import os
+import time
+import logging
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-
-# =========================================
-# LOAD ENVIRONMENT VARIABLES
-# =========================================
-
 load_dotenv()
 
-api_key = os.getenv("GOOGLE_API_KEY")
+logger = logging.getLogger(__name__)
+
+# Set GOOGLE_API_KEY in your environment or .env file.
+API_KEY = os.getenv("GOOGLE_API_KEY")
 
 client = None
 
-if api_key:
-    # =========================================
-    # GEMINI CLIENT
-    # =========================================
-    #
-    # retry_options:
-    # max_retries = 0
-    #
-    # This is important because the Google SDK
-    # normally retries transient 5xx errors.
-    #
-    # We want EACH model to be attempted ONLY ONCE.
-    # =========================================
-
-    client = genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(
-            retry_options=types.HttpRetryOptions(
-                attempts=1
-            )
+if API_KEY:
+    try:
+        client = genai.Client(
+            api_key=API_KEY,
+            http_options=types.HttpOptions(
+                retry_options=types.HttpRetryOptions(attempts=1)
+            ),
         )
-    )
+    except Exception:
+        logger.exception("Could not initialize Gemini client")
 
 
-# =========================================
-# MODEL ORDER
-# =========================================
+# Use one fast model to avoid delays from sequential fallback attempts.
+# If this model is unavailable for your API account, choose a supported
+# Flash model from Google's AI Studio model list.
+PRIMARY_MODEL = "gemini-2.5-flash"
 
-PRIMARY_MODEL = "gemini-3.8-flash"
+MAX_RESUME_CHARS = 3000
+MAX_JOB_CHARS = 1800
+MAX_HISTORY_MESSAGES = 4
+MAX_HISTORY_CHARS = 1000
+MAX_OUTPUT_TOKENS = 220
 
-FALLBACK_MODELS = [
-    "gemini-3.7-flash",
-    "gemini-3.5-flash"
-]
 
+def _short_list(items, limit=8):
+    """Format a short list without sending excessive prompt context."""
+    return ", ".join(str(item) for item in (items or [])[:limit]) or "None"
 
-# =========================================
-# CHAT RESPONSE
-# =========================================
 
 def get_chat_response(
     user_message,
@@ -66,503 +56,118 @@ def get_chat_response(
     ats_score=0,
     strengths=None,
     suggestions=None,
-    chat_history=None
+    chat_history=None,
 ):
+    """Generate a concise ResumeIQ response using Gemini."""
 
     if client is None:
         return (
-            "ResumeIQ could not authenticate with the Gemini API. "
-            "Please check your GOOGLE_API_KEY."
+            "ResumeIQ cannot connect to Gemini because the API client "
+            "is not configured. Please check GOOGLE_API_KEY."
         )
 
     matched_skills = matched_skills or []
-
     missing_skills = missing_skills or []
-
     strengths = strengths or []
-
     suggestions = suggestions or []
-
     chat_history = chat_history or []
 
+    resume_context = (resume_text or "")[:MAX_RESUME_CHARS]
+    job_context = (job_description or "")[:MAX_JOB_CHARS]
 
-    # =========================================
-    # FORMAT SKILLS
-    # =========================================
+    # Keep only recent, valid, short messages.
+    history_lines = []
 
-    matched_skills_text = (
-        ", ".join(matched_skills)
-        if matched_skills
-        else "None detected"
-    )
+    for item in chat_history[-MAX_HISTORY_MESSAGES:]:
+        if not isinstance(item, dict):
+            continue
 
-    missing_skills_text = (
-        ", ".join(missing_skills)
-        if missing_skills
-        else "None detected"
-    )
+        role = item.get("role")
+        content = item.get("content", "")
 
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
 
-    # =========================================
-    # FORMAT STRENGTHS
-    # =========================================
+        content = content.strip()[:MAX_HISTORY_CHARS]
+        if content:
+            label = "User" if role == "user" else "ResumeIQ"
+            history_lines.append(f"{label}: {content}")
 
-    strengths_text = (
-        "\n".join(
-            f"- {item}"
-            for item in strengths
-        )
-        if strengths
-        else "None provided"
-    )
-
-
-    # =========================================
-    # FORMAT SUGGESTIONS
-    # =========================================
-
-    suggestions_text = (
-        "\n".join(
-            f"- {item}"
-            for item in suggestions
-        )
-        if suggestions
-        else "None provided"
-    )
-
-
-    # =========================================
-    # CONVERSATION HISTORY
-    # =========================================
-
-    conversation_history = ""
-
-    for message in chat_history:
-
-        role = message.get(
-            "role",
-            "user"
-        )
-
-        content = message.get(
-            "content",
-            ""
-        )
-
-        if role == "user":
-
-            conversation_history += (
-                f"User: {content}\n"
-            )
-
-        elif role == "assistant":
-
-            conversation_history += (
-                f"ResumeIQ: {content}\n"
-            )
-
-
-    if not conversation_history:
-
-        conversation_history = (
-            "No previous conversation."
-        )
-
-
-    # =========================================
-    # PROMPT
-    # =========================================
+    history_text = "\n".join(history_lines) or "No previous conversation."
 
     prompt = f"""
 You are ResumeIQ, an AI resume and career assistant.
 
-Answer the user's question using the resume,
-job description, and analysis information.
+RULES:
+- Always answer in clear English.
+- Answer the user's exact question first.
+- Be concise and practical; usually use 3-5 bullet points.
+- Never invent skills, qualifications, projects, or achievements.
+- Use the analysis data when relevant.
+- An ATS-style score does not guarantee passing a real ATS.
+- If asked for a language other than English, explain that English
+  is the currently supported response language.
 
-IMPORTANT RULES:
+ANALYSIS:
+Resume-job similarity: {similarity_score}%
+Keyword coverage: {keyword_coverage}%
+ATS-style readiness: {ats_score}%
+Matched skills: {_short_list(matched_skills, 20)}
+Missing skills: {_short_list(missing_skills, 20)}
+Strengths: {_short_list(strengths)}
+Suggestions: {_short_list(suggestions)}
 
-- Answer directly.
-- Keep the answer concise.
-- Use bullet points when useful.
-- Focus on the most important points.
-- Do not unnecessarily repeat the resume.
-- Do not unnecessarily repeat the job description.
-- Do not invent experience, skills, education,
-  projects, certifications, or achievements.
-- If something is missing, clearly identify it.
-- Give practical and actionable recommendations.
-- Do not guarantee ATS success.
-- Similarity score is not a guaranteed ATS score.
-- Use previous conversation when answering follow-up
-  questions.
+RESUME EXCERPT:
+{resume_context}
 
-========================================
-RESUME ANALYSIS
-========================================
+JOB DESCRIPTION EXCERPT:
+{job_context}
 
-Resume-Job Similarity:
-{similarity_score}%
+RECENT CONVERSATION:
+{history_text}
 
-Keyword Coverage:
-{keyword_coverage}%
+CURRENT QUESTION:
+{str(user_message)[:1500]}
 
-ATS Readiness:
-{ats_score}%
+Give a direct, useful answer without repeating all the supplied context.
+""".strip()
 
-Matched Skills:
-{matched_skills_text}
+    start_time = time.perf_counter()
 
-Missing Skills:
-{missing_skills_text}
-
-Resume Strengths:
-{strengths_text}
-
-Resume Suggestions:
-{suggestions_text}
-
-========================================
-RESUME
-========================================
-
-{resume_text}
-
-========================================
-JOB DESCRIPTION
-========================================
-
-{job_description}
-
-========================================
-PREVIOUS CONVERSATION
-========================================
-
-{conversation_history}
-
-========================================
-CURRENT USER QUESTION
-========================================
-
-{user_message}
-
-========================================
-ANSWER
-========================================
-
-Give the most useful answer first.
-
-Keep the response concise and actionable.
-"""
-
-
-    # =========================================
-    # MODEL ORDER
-    # =========================================
-
-    models_to_try = [
-        PRIMARY_MODEL,
-        *FALLBACK_MODELS
-    ]
-
-
-    # =========================================
-    # TRY EACH MODEL ONLY ONCE
-    # =========================================
-
-    for model_name in models_to_try:
-
-        print(
-            "\n========================================="
-        )
-
-        print(
-            f"ResumeIQ: Trying model: {model_name}"
-        )
-
-        print(
-            "ResumeIQ: This model will be attempted "
-            "ONLY ONCE."
-        )
-
-        print(
-            "=========================================\n"
-        )
-
-
-        try:
-
-            # =====================================
-            # FAST GENERATION CONFIG
-            # =====================================
-
-            config = types.GenerateContentConfig(
-
+    try:
+        response = client.models.generate_content(
+            model=PRIMARY_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 temperature=0.3,
-
-                max_output_tokens=300,
-
+                max_output_tokens=MAX_OUTPUT_TOKENS,
                 thinking_config=types.ThinkingConfig(
                     thinking_level="low"
-                )
+                ),
+            ),
+        )
+
+        answer = getattr(response, "text", None)
+
+        if answer and answer.strip():
+            logger.info(
+                "Gemini response generated in %.2f seconds using %s",
+                time.perf_counter() - start_time,
+                PRIMARY_MODEL,
             )
+            return answer.strip()
 
+        logger.warning("Gemini returned an empty response")
 
-            print(
-                f"ResumeIQ: Sending request to "
-                f"{model_name}..."
-            )
+    except Exception:
+        logger.exception(
+            "Gemini request failed after %.2f seconds",
+            time.perf_counter() - start_time,
+        )
 
-
-            # =====================================
-            # SINGLE API REQUEST
-            # =====================================
-
-            response = client.models.generate_content(
-
-                model=model_name,
-
-                contents=prompt,
-
-                config=config
-            )
-
-
-            # =====================================
-            # CHECK RESPONSE
-            # =====================================
-
-            if response is None:
-
-                print(
-                    f"ResumeIQ: {model_name} "
-                    "returned no response."
-                )
-
-                print(
-                    "ResumeIQ: Moving to next model..."
-                )
-
-                continue
-
-
-            if not response.text:
-
-                print(
-                    f"ResumeIQ: {model_name} "
-                    "returned an empty response."
-                )
-
-                print(
-                    "ResumeIQ: Moving to next model..."
-                )
-
-                continue
-
-
-            # =====================================
-            # SUCCESS
-            # =====================================
-
-            print(
-                "\n========================================="
-            )
-
-            print(
-                f"ResumeIQ: SUCCESS"
-            )
-
-            print(
-                f"ResumeIQ: Model used: {model_name}"
-            )
-
-            print(
-                "=========================================\n"
-            )
-
-
-            return response.text
-
-
-        # =========================================
-        # ERROR HANDLING
-        # =========================================
-
-        except Exception as error:
-
-            error_text = str(error)
-
-
-            print(
-                "\n========================================="
-            )
-
-            print(
-                "GEMINI ERROR:"
-            )
-
-            print(
-                error_text
-            )
-
-            print(
-                f"MODEL: {model_name}"
-            )
-
-            print(
-                "=========================================\n"
-            )
-
-
-            # =====================================
-            # 503 / UNAVAILABLE
-            # =====================================
-
-            if (
-                "503" in error_text
-                or
-                "UNAVAILABLE" in error_text
-                or
-                "overloaded" in error_text.lower()
-            ):
-
-                print(
-                    f"ResumeIQ: {model_name} "
-                    "returned 503/unavailable."
-                )
-
-                print(
-                    "ResumeIQ: NO RETRY."
-                )
-
-                print(
-                    "ResumeIQ: Moving immediately "
-                    "to the next model."
-                )
-
-                continue
-
-
-            # =====================================
-            # 429 RATE LIMIT
-            # =====================================
-
-            if (
-                "429" in error_text
-                or
-                "RESOURCE_EXHAUSTED" in error_text
-            ):
-
-                print(
-                    f"ResumeIQ: {model_name} "
-                    "returned 429 rate limit."
-                )
-
-                print(
-                    "ResumeIQ: NO RETRY."
-                )
-
-                print(
-                    "ResumeIQ: Moving immediately "
-                    "to the next model."
-                )
-
-                continue
-
-
-            # =====================================
-            # 404 MODEL NOT FOUND
-            # =====================================
-
-            if (
-                "404" in error_text
-                or
-                "NOT_FOUND" in error_text
-            ):
-
-                print(
-                    f"ResumeIQ: {model_name} "
-                    "was not found."
-                )
-
-                print(
-                    "ResumeIQ: NO RETRY."
-                )
-
-                print(
-                    "ResumeIQ: Moving immediately "
-                    "to the next model."
-                )
-
-                continue
-
-
-            # =====================================
-            # AUTHENTICATION / PERMISSION
-            # =====================================
-
-            if (
-                "401" in error_text
-                or
-                "403" in error_text
-                or
-                "API key" in error_text
-                or
-                "PERMISSION_DENIED" in error_text
-            ):
-
-                print(
-                    "ResumeIQ: Authentication or "
-                    "permission problem."
-                )
-
-
-                return (
-                    "ResumeIQ could not authenticate "
-                    "with the Gemini API. Please check "
-                    "your GOOGLE_API_KEY."
-                )
-
-
-            # =====================================
-            # OTHER ERROR
-            # =====================================
-
-            print(
-                f"ResumeIQ: Unexpected error from "
-                f"{model_name}."
-            )
-
-            print(
-                "ResumeIQ: NO RETRY."
-            )
-
-            print(
-                "ResumeIQ: Moving to next model."
-            )
-
-            continue
-
-
-    # =========================================
-    # ALL MODELS FAILED
-    # =========================================
-
-    print(
-        "\n========================================="
-    )
-
-    print(
-        "ResumeIQ: ALL GEMINI MODELS FAILED."
-    )
-
-    print(
-        "=========================================\n"
-    )
-
-
+    # Avoid slow sequential model fallback attempts.
     return (
-        "ResumeIQ could not generate a response "
-        "right now. The available Gemini models "
-        "are temporarily unavailable. Please "
-        "try again shortly."
+        "Sorry, ResumeIQ could not get a response from Gemini right now. "
+        "Please try again shortly. If this keeps happening, check the "
+        "server logs and verify the selected model is available."
     )

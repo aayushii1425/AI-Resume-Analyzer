@@ -1,7 +1,13 @@
+
 from ollama import chat
 
-
 MODEL_NAME = "qwen2.5:7b"
+
+# Speed-focused defaults. Actual speed depends on your hardware.
+MAX_HISTORY_MESSAGES = 4
+MAX_RESPONSE_TOKENS = 180
+MAX_RESUME_CHARS = 4000
+MAX_JOB_CHARS = 2000
 
 
 def get_ollama_chat_response(
@@ -15,140 +21,85 @@ def get_ollama_chat_response(
     ats_score=0,
     strengths=None,
     suggestions=None,
-    chat_history=None
+    chat_history=None,
 ):
-
     matched_skills = matched_skills or []
     missing_skills = missing_skills or []
     strengths = strengths or []
     suggestions = suggestions or []
     chat_history = chat_history or []
 
+    # Limit context to reduce prompt-processing time.
+    resume_context = (resume_text or "")[:MAX_RESUME_CHARS]
+    job_context = (job_description or "")[:MAX_JOB_CHARS]
 
     system_prompt = f"""
-You are ResumeIQ, an AI resume and career assistant.
+You are ResumeIQ, a concise and practical resume and career assistant.
+Always reply in English only. Never reply in Hindi or Chinese.
 
-You are running locally using Qwen through Ollama.
+Help users improve their resumes for the provided job description.
+Use the supplied analysis data when relevant.
+Never invent skills, experience, education, projects, or achievements.
+An ATS-style score is an estimate, not a guarantee of passing a real ATS.
 
-==============================
-LANGUAGE POLICY
-==============================
+Keep answers direct, helpful, and easy to understand.
+Prefer short paragraphs or up to 4 bullet points.
+Answer the exact question first. Avoid repeating the entire resume.
+If the user asks for detailed guidance, provide more detail.
 
-IMPORTANT:
+RESUME (may be truncated):
+{resume_context}
 
-1. ALWAYS respond in English.
-2. NEVER respond in Chinese.
-3. NEVER respond in Hindi.
-4. NEVER mix multiple languages.
-5. Even if the user writes in another language,
-   respond only in English.
-6. If the user asks you to respond in another
-   language, politely explain that ResumeIQ
-   currently supports English responses only.
-7. Keep your English clear, professional,
-   natural, and easy to understand.
+JOB DESCRIPTION (may be truncated):
+{job_context}
 
-==============================
-RESUME INFORMATION
-==============================
+ANALYSIS:
+Resume match: {similarity_score}%
+Keyword coverage: {keyword_coverage}%
+ATS-style readiness: {ats_score}%
+Matched skills: {", ".join(map(str, matched_skills[:30]))}
+Missing skills: {", ".join(map(str, missing_skills[:30]))}
+Strengths: {", ".join(map(str, strengths[:8]))}
+Suggestions: {", ".join(map(str, suggestions[:8]))}
+""".strip()
 
-Resume:
-{resume_text}
+    messages = [{"role": "system", "content": system_prompt}]
 
-==============================
-JOB DESCRIPTION
-==============================
-
-{job_description}
-
-==============================
-ANALYSIS RESULTS
-==============================
-
-Resume Match:
-{similarity_score}%
-
-Keyword Coverage:
-{keyword_coverage}%
-
-ATS-style Readiness:
-{ats_score}%
-
-Matched Skills:
-{", ".join(matched_skills)}
-
-Missing Skills:
-{", ".join(missing_skills)}
-
-Strengths:
-{", ".join(strengths)}
-
-Suggestions:
-{", ".join(suggestions)}
-
-==============================
-BEHAVIOR
-==============================
-
-Help the user understand and improve their resume.
-
-When answering:
-
-- Focus on the user's resume.
-- Relate advice to the job description.
-- Explain weaknesses clearly.
-- Give practical suggestions.
-- Do not invent skills, experience,
-  education, projects, or achievements.
-- Do not claim that the ATS score guarantees
-  passing a real ATS.
-- Use the analysis results when relevant.
-- Keep answers concise unless the user asks
-  for more detail.
-"""
-
-
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-    ]
-
-
-    # Add previous conversation
-    for message in chat_history[-10:]:
-
-        role = message.get(
-            "role",
-            "user"
-        )
-
-        content = message.get(
-            "content",
-            ""
-        )
-
-        if role not in ["user", "assistant"]:
+    # Keep only recent, valid conversation messages.
+    for item in chat_history[-MAX_HISTORY_MESSAGES:]:
+        if not isinstance(item, dict):
             continue
 
-        messages.append({
-            "role": role,
-            "content": content
-        })
+        role = item.get("role")
+        content = item.get("content", "")
 
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
 
-    # Add current user question
+        content = content.strip()
+        if content:
+            messages.append({
+                "role": role,
+                "content": content[:1500],
+            })
+
     messages.append({
         "role": "user",
-        "content": user_message
+        "content": str(user_message)[:2000],
     })
-
 
     response = chat(
         model=MODEL_NAME,
-        messages=messages
+        messages=messages,
+        stream=False,
+        keep_alive="10m",
+        options={
+            "temperature": 0.3,
+            "num_predict": MAX_RESPONSE_TOKENS,
+            "num_ctx": 4096,
+        },
     )
 
-
-    return response["message"]["content"]
+    # Compatible with Ollama response objects and dictionary-like responses.
+    message = response["message"]
+    return message["content"].strip()
