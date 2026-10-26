@@ -31,7 +31,11 @@ if API_KEY:
 # Use one fast model to avoid delays from sequential fallback attempts.
 # If this model is unavailable for your API account, choose a supported
 # Flash model from Google's AI Studio model list.
-PRIMARY_MODEL = "gemini-3.8-flash"
+MODELS_TO_TRY = [
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+]
 
 MAX_RESUME_CHARS = 3000
 MAX_JOB_CHARS = 1800
@@ -132,7 +136,53 @@ CURRENT QUESTION:
 Give a direct, useful answer without repeating all the supplied context.
 """.strip()
 
+    
     start_time = time.perf_counter()
+
+    for model_name in MODELS_TO_TRY:
+        try:
+            logger.info("Trying Gemini model: %s", model_name)
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.3,
+                    max_output_tokens=MAX_OUTPUT_TOKENS,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level="low"
+                    ),
+                ),
+            )
+
+            answer = getattr(response, "text", None)
+
+            if answer and answer.strip():
+                logger.info(
+                    "Gemini response generated using %s in %.2f seconds",
+                    model_name,
+                    time.perf_counter() - start_time,
+                )
+                return answer.strip()
+
+            logger.warning(
+                "Model %s returned an empty response; trying next model",
+                model_name,
+            )
+
+        except Exception:
+            logger.exception(
+                "Gemini model %s failed; trying next model",
+                model_name,
+            )
+
+    logger.error("All Gemini models failed")
+
+    return (
+        "Sorry, ResumeIQ is temporarily unable to respond. "
+        "All available Gemini models failed. Please try again shortly."
+    )
+
 
     try:
         response = client.models.generate_content(
