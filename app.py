@@ -19,7 +19,10 @@ from utils.skill_extractor import extract_skills
 from utils.similarity import calculate_similarity
 from utils.ats_checker import check_ats_requirements
 from utils.report_generator import generate_report
-from utils.gemini_chatbot import get_chat_response
+from utils.gemini_chatbot import (
+    GeminiChatError,
+    get_chat_response,
+)
 from utils.ollama_chatbot import get_ollama_chat_response
 
 
@@ -616,15 +619,29 @@ def chat():
         }
 
         if mode == "offline":
-            response = get_ollama_chat_response(
-                user_message,
-                **common_context
-            )
+            try:
+                response = get_ollama_chat_response(
+                    user_message,
+                    **common_context
+                )
+            except Exception as error:
+                app.logger.warning(
+                    "Ollama chat request failed: %s",
+                    error,
+                )
+                return (
+                    "Offline chat could not reach Ollama. Make sure Ollama "
+                    "is running and the qwen2.5:3b model is installed.",
+                    503,
+                )
         else:
-            response = get_chat_response(
-                user_message,
-                **common_context
-            )
+            try:
+                response = get_chat_response(
+                    user_message,
+                    **common_context
+                )
+            except GeminiChatError as error:
+                return str(error), error.status_code
 
         chat_history.extend([
             {"role": "user", "content": user_message},
@@ -705,7 +722,7 @@ def download_report():
 
 
 @app.errorhandler(405)
-def method_not_allowed(error):
+def method_not_allowed(_error):
     if request.path == "/analyze":
         return (
             "The /analyze route requires a POST form submission. "

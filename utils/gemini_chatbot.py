@@ -3,15 +3,70 @@ import os
 import time
 import logging
 
+import httpx
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Set GOOGLE_API_KEY in your environment or .env file.
+
+class GeminiChatError(RuntimeError):
+    """A Gemini failure that can be returned safely to the chat client."""
+
+    def __init__(self, message, status_code=503):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def _public_api_error(error):
+    """Translate a Gemini API error into a safe user-facing message."""
+    code = getattr(error, "code", None)
+    status = getattr(error, "status", None)
+
+    if code in (401, 403) or status == "PERMISSION_DENIED":
+        return GeminiChatError(
+            "Gemini could not authenticate this request. Check the API key "
+            "and Google Cloud project configuration.",
+            503,
+        )
+
+    if code == 429 or status == "RESOURCE_EXHAUSTED":
+        return GeminiChatError(
+            "Gemini's request limit has been reached. Wait a little and try "
+            "again, or switch to Offline mode.",
+            503,
+        )
+
+    if code == 503 or status == "UNAVAILABLE":
+        return GeminiChatError(
+            "Gemini is temporarily unavailable. Please try again shortly, "
+            "or switch to Offline mode.",
+            503,
+        )
+
+    if code == 504 or status == "DEADLINE_EXCEEDED":
+        return GeminiChatError(
+            "Gemini took too long to respond. Please try again.",
+            504,
+        )
+
+    if code == 404 or status == "NOT_FOUND":
+        return GeminiChatError(
+            "None of the configured Gemini models is available. Check the "
+            "model names in the server configuration.",
+            503,
+        )
+
+    return GeminiChatError(
+        "Gemini could not complete the request. Please try again shortly.",
+        502,
+    )
+
+
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
 client = None
@@ -21,20 +76,19 @@ if API_KEY:
         client = genai.Client(
             api_key=API_KEY,
             http_options=types.HttpOptions(
-                retry_options=types.HttpRetryOptions(attempts=1)
+                retry_options=types.HttpRetryOptions(attempts=2)
             ),
         )
     except Exception:
         logger.exception("Could not initialize Gemini client")
 
 
-# Use one fast model to avoid delays from sequential fallback attempts.
-# If this model is unavailable for your API account, choose a supported
-# Flash model from Google's AI Studio model list.
+# Use model IDs supported by your Gemini API account.
 MODELS_TO_TRY = [
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.5-flash",
+    "gemini-2.5-flash",
 ]
 
 MAX_RESUME_CHARS = 3000
@@ -45,7 +99,7 @@ MAX_OUTPUT_TOKENS = 220
 
 
 def _short_list(items, limit=8):
-    """Format a short list without sending excessive prompt context."""
+    """Format a short list without excessive prompt context."""
     return ", ".join(str(item) for item in (items or [])[:limit]) or "None"
 
 
@@ -65,9 +119,10 @@ def get_chat_response(
     """Generate a concise ResumeIQ response using Gemini."""
 
     if client is None:
-        return (
-            "ResumeIQ cannot connect to Gemini because the API client "
-            "is not configured. Please check GOOGLE_API_KEY."
+        raise GeminiChatError(
+            "Gemini is not configured. Add a valid GOOGLE_API_KEY, or switch "
+            "to Offline mode.",
+            503,
         )
 
     matched_skills = matched_skills or []
@@ -79,7 +134,6 @@ def get_chat_response(
     resume_context = (resume_text or "")[:MAX_RESUME_CHARS]
     job_context = (job_description or "")[:MAX_JOB_CHARS]
 
-    # Keep only recent, valid, short messages.
     history_lines = []
 
     for item in chat_history[-MAX_HISTORY_MESSAGES:]:
@@ -93,6 +147,7 @@ def get_chat_response(
             continue
 
         content = content.strip()[:MAX_HISTORY_CHARS]
+
         if content:
             label = "User" if role == "user" else "ResumeIQ"
             history_lines.append(f"{label}: {content}")
@@ -136,8 +191,9 @@ CURRENT QUESTION:
 Give a direct, useful answer without repeating all the supplied context.
 """.strip()
 
-    
     start_time = time.perf_counter()
+    last_api_error = None
+    saw_empty_response = False
 
     for model_name in MODELS_TO_TRY:
         try:
@@ -170,54 +226,91 @@ Give a direct, useful answer without repeating all the supplied context.
                 model_name,
             )
 
-        except Exception:
+            saw_empty_response = True
+
+        except genai_errors.APIError as error:
+            logger.warning(
+                "Gemini model %s failed with API status %s (%s)",
+                model_name,
+                error.code,
+                error.status,
+            )
+            last_api_error = error
+
+            if error.code in (401, 403) or error.status == "PERMISSION_DENIED":
+                raise _public_api_error(error) from error
+
+            if error.code == 404 or error.status == "NOT_FOUND":
+                continue
+
+            if (
+                error.code in (429, 503, 504)
+                or error.status in (
+                    "RESOURCE_EXHAUSTED",
+                    "UNAVAILABLE",
+                    "DEADLINE_EXCEEDED",
+                )
+            ):
+                continue
+
+            raise _public_api_error(error) from error
+
+        except httpx.TimeoutException as error:
+            logger.warning(
+                "Gemini model %s timed out: %s",
+                model_name,
+                type(error).__name__,
+            )
+            last_api_error = error
+
+        except (httpx.TransportError, ConnectionError) as error:
+            logger.warning(
+                "Gemini model %s could not be reached: %s",
+                model_name,
+                type(error).__name__,
+            )
+            last_api_error = error
+
+        except Exception as error:
             logger.exception(
-                "Gemini model %s failed; trying next model",
+                "Unexpected error while requesting Gemini model %s",
                 model_name,
             )
+            raise GeminiChatError(
+                "ResumeIQ encountered an unexpected error while contacting "
+                "Gemini. Please try again.",
+                502,
+            ) from error
 
-    logger.error("All Gemini models failed")
-
-    return (
-        "Sorry, ResumeIQ is temporarily unable to respond. "
-        "All available Gemini models failed. Please try again shortly."
+    logger.error(
+        "All Gemini models failed after %.2f seconds",
+        time.perf_counter() - start_time,
     )
 
+    if isinstance(last_api_error, genai_errors.APIError):
+        raise _public_api_error(last_api_error) from last_api_error
 
-    try:
-        response = client.models.generate_content(
-            model=PRIMARY_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-                thinking_config=types.ThinkingConfig(
-                    thinking_level="low"
-                ),
-            ),
+    if isinstance(last_api_error, httpx.TimeoutException):
+        raise GeminiChatError(
+            "Gemini took too long to respond. Please try again.",
+            504,
+        ) from last_api_error
+
+    if isinstance(last_api_error, (httpx.TransportError, ConnectionError)):
+        raise GeminiChatError(
+            "ResumeIQ could not connect to Gemini. Check your network "
+            "connection and try again.",
+            503,
+        ) from last_api_error
+
+    if saw_empty_response:
+        raise GeminiChatError(
+            "Gemini returned an empty response. Please try again.",
+            502,
         )
 
-        answer = getattr(response, "text", None)
-
-        if answer and answer.strip():
-            logger.info(
-                "Gemini response generated in %.2f seconds using %s",
-                time.perf_counter() - start_time,
-                PRIMARY_MODEL,
-            )
-            return answer.strip()
-
-        logger.warning("Gemini returned an empty response")
-
-    except Exception:
-        logger.exception(
-            "Gemini request failed after %.2f seconds",
-            time.perf_counter() - start_time,
-        )
-
-    # Avoid slow sequential model fallback attempts.
-    return (
-        "Sorry, ResumeIQ could not get a response from Gemini right now. "
-        "Please try again shortly. If this keeps happening, check the "
-        "server logs and verify the selected model is available."
+    raise GeminiChatError(
+        "ResumeIQ could not connect to Gemini. Check your network connection "
+        "and try again.",
+        503,
     )
