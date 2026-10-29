@@ -1,4 +1,4 @@
-
+import secrets
 import os
 import re
 import tempfile
@@ -34,18 +34,16 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Set SECRET_KEY in your deployment environment.
-# The fallback is only for local development.
+# Configure SECRET_KEY in your deployment environment.
 app.secret_key = os.getenv(
     "SECRET_KEY",
-    "resumeiq-local-development-key"
+    "resumeiq-local-development-key",
 )
 
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
-# IMPORTANT:
-# This in-memory store is suitable only for a simple,
-# single-process demo. Use per-user storage for production.
+# In-memory storage keyed by browser-session analysis ID.
+# This is a simple demo approach, not persistent production storage.
 analysis_data = {}
 analysis_lock = Lock()
 
@@ -53,12 +51,6 @@ analysis_lock = Lock()
 # =========================================================
 # SKILL RECOGNITION
 # =========================================================
-
-# Add to this dictionary when you want to recognize
-# additional skills or job requirements.
-#
-# The app still uses your existing utils.skill_extractor.
-# These rules supplement it; they do not replace it.
 
 SKILL_PATTERNS = {
     "full-stack development": [
@@ -126,10 +118,10 @@ SKILL_PATTERNS = {
         r"\bjava\b",
     ],
     "c++": [
-        r"\bc\+\+\b",
+        r"(?<!\w)c\+\+(?!\w)",
     ],
     "c#": [
-        r"\bc#\b",
+        r"(?<!\w)c#(?!\w)",
     ],
     "machine learning": [
         r"\bmachine learning\b",
@@ -216,7 +208,7 @@ def normalize_text(text):
     return re.sub(
         r"\s+",
         " ",
-        str(text or "").lower()
+        str(text or "").lower(),
     ).strip()
 
 
@@ -236,10 +228,8 @@ def find_rule_based_skills(text):
 
 def extract_all_skills(text):
     """
-    Combine existing skill extraction with supplemental rules.
-
-    Keep the original extractor so existing project skills
-    continue to work.
+    Combine the existing skill extractor with supplemental
+    rule-based matching.
     """
     text = str(text or "")
 
@@ -252,14 +242,12 @@ def extract_all_skills(text):
     if not isinstance(existing, (list, tuple, set)):
         existing = []
 
-    # Normalize the existing extractor's output.
     skills = {
         normalize_text(skill)
         for skill in existing
         if skill and normalize_text(skill)
     }
 
-    # Supplement the existing extractor.
     skills.update(find_rule_based_skills(text))
 
     return sorted(skills)
@@ -267,8 +255,8 @@ def extract_all_skills(text):
 
 def split_job_skills(raw_job_skills, original_job_text):
     """
-    Use the original job text to catch multi-word phrases
-    that preprocessing may have removed or altered.
+    Include skills found in the original job description,
+    because preprocessing may alter multi-word expressions.
     """
     combined = {
         normalize_text(skill)
@@ -296,17 +284,12 @@ def home():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    global analysis_data
-
     resume = request.files.get("resume")
     job_description = request.form.get(
         "job_description", ""
     ).strip()
 
-    # -------------------------------
-    # VALIDATE INPUTS
-    # -------------------------------
-
+    # Validate inputs.
     if not resume or not resume.filename:
         return "Please upload a resume PDF.", 400
 
@@ -316,10 +299,7 @@ def analyze():
     if not resume.filename.lower().endswith(".pdf"):
         return "Please upload a PDF resume.", 400
 
-    # -------------------------------
-    # EXTRACT PDF TEXT
-    # -------------------------------
-
+    # Extract PDF text.
     try:
         resume_text = extract_text_from_pdf(resume)
     except Exception:
@@ -337,21 +317,18 @@ def analyze():
             400,
         )
 
-    # -------------------------------
-    # PREPROCESS TEXT
-    # -------------------------------
-
+    # Preprocess text.
     try:
         clean_resume = preprocess_text(resume_text)
         clean_job_description = preprocess_text(job_description)
     except Exception:
         app.logger.exception("Text preprocessing failed")
-        return "Could not process the resume or job description.", 500
+        return (
+            "Could not process the resume or job description.",
+            500,
+        )
 
-    # -------------------------------
-    # EXTRACT SKILLS
-    # -------------------------------
-
+    # Extract skills.
     resume_skills = extract_all_skills(
         clean_resume + "\n" + resume_text
     )
@@ -360,17 +337,12 @@ def analyze():
         clean_job_description + "\n" + job_description
     )
 
-    # Use the original description as well, since preprocessing
-    # can remove punctuation or change multi-word expressions.
     job_skills = split_job_skills(
         extracted_job_skills,
-        job_description
+        job_description,
     )
 
-    # -------------------------------
-    # MATCHED AND MISSING SKILLS
-    # -------------------------------
-
+    # Find matched and missing skills.
     resume_skill_set = set(resume_skills)
     job_skill_set = set(job_skills)
 
@@ -382,50 +354,40 @@ def analyze():
         job_skill_set - resume_skill_set
     )
 
-    # -------------------------------
-    # SIMILARITY SCORE
-    # -------------------------------
-
+    # Calculate similarity score.
     try:
         similarity_score = calculate_similarity(
             clean_resume,
-            clean_job_description
+            clean_job_description,
         )
     except Exception:
         app.logger.exception("Similarity calculation failed")
         similarity_score = 0
 
-    # Normalize a numeric similarity score for display.
     try:
         similarity_score = float(similarity_score)
     except (TypeError, ValueError):
         similarity_score = 0.0
 
-    # Some similarity helpers return a fraction between 0 and 1.
+    # Convert fractional scores to percentages.
     if 0 <= similarity_score <= 1:
         similarity_score *= 100
 
     similarity_score = round(
         max(0.0, min(100.0, similarity_score)),
-        2
+        2,
     )
 
-    # -------------------------------
-    # KEYWORD COVERAGE
-    # -------------------------------
-
+    # Calculate keyword coverage.
     if job_skill_set:
         keyword_coverage = round(
             len(matched_skills) / len(job_skill_set) * 100,
-            2
+            2,
         )
     else:
         keyword_coverage = 0.0
 
-    # -------------------------------
-    # STRENGTHS
-    # -------------------------------
-
+    # Build strengths.
     strengths = []
 
     if matched_skills:
@@ -456,10 +418,7 @@ def analyze():
             "job skills. Review the resume and job requirements."
         )
 
-    # -------------------------------
-    # IMPROVEMENT SUGGESTIONS
-    # -------------------------------
-
+    # Build improvement suggestions.
     suggestions = []
 
     if missing_skills:
@@ -490,10 +449,7 @@ def analyze():
             "responsibilities and requirements."
         )
 
-    # -------------------------------
-    # ATS-STYLE CHECKS
-    # -------------------------------
-
+    # Perform ATS-style checks.
     try:
         ats_results = check_ats_requirements(resume_text)
     except Exception:
@@ -515,14 +471,7 @@ def analyze():
 
     ats_score = ats_results.get("ats_score", 0)
 
-    # -------------------------------
-    # SAVE ANALYSIS
-    # -------------------------------
-
-    # NOTE: This variable is shared by all visitors in one
-    # server process. This is not safe for a multi-user
-    # production application; use session-specific storage
-    # or a database for production.
+    # Save analysis under this browser session's analysis ID.
     new_analysis = {
         "similarity_score": similarity_score,
         "keyword_coverage": keyword_coverage,
@@ -537,15 +486,19 @@ def analyze():
         "resume_text": resume_text,
     }
 
-    with analysis_lock:
-        analysis_data = new_analysis
+    analysis_id = session.get("analysis_id")
 
+    if not analysis_id:
+        analysis_id = secrets.token_urlsafe(32)
+        session["analysis_id"] = analysis_id
+
+    with analysis_lock:
+        analysis_data[analysis_id] = new_analysis
+
+    # Start fresh chat history after each analysis.
     session["chat_history"] = []
 
-    # -------------------------------
-    # RENDER EXISTING RESULTS TEMPLATE
-    # -------------------------------
-
+    # Render results page.
     return render_template(
         "result.html",
         similarity_score=similarity_score,
@@ -585,16 +538,48 @@ def chat():
                 400,
             )
 
-        with analysis_lock:
-            current_analysis = dict(analysis_data)
+        # Get analysis belonging to this browser session.
+        analysis_id = session.get("analysis_id")
 
+        with analysis_lock:
+            current_analysis = (
+                dict(analysis_data.get(analysis_id, {}))
+                if analysis_id
+                else {}
+            )
+
+        # Allow greetings before a resume is analyzed.
         if not current_analysis:
-            return "Please analyze a resume first.", 400
+            greeting_messages = {
+                "hi",
+                "hello",
+                "hey",
+                "hello!",
+                "hi!",
+                "hey!",
+                "good morning",
+                "good afternoon",
+                "good evening",
+            }
+
+            if user_message.lower().strip() in greeting_messages:
+                return (
+                    "Hello! 👋 I'm ResumeIQ, your AI career assistant. "
+                    "Please analyze your resume first so I can help with "
+                    "your ATS score, missing skills, and job match."
+                )
+
+            return (
+                "Please analyze a resume first so I can answer "
+                "questions using your actual resume and job description."
+            ), 400
 
         chat_history = session.get("chat_history", [])
 
         common_context = {
-            "resume_text": current_analysis.get("resume_text", ""),
+            "resume_text": current_analysis.get(
+                "resume_text", ""
+            ),
             "job_description": current_analysis.get(
                 "job_description", ""
             ),
@@ -613,39 +598,57 @@ def chat():
             "ats_score": current_analysis.get(
                 "ats_results", {}
             ).get("ats_score", 0),
-            "strengths": current_analysis.get("strengths", []),
-            "suggestions": current_analysis.get("suggestions", []),
+            "strengths": current_analysis.get(
+                "strengths", []
+            ),
+            "suggestions": current_analysis.get(
+                "suggestions", []
+            ),
             "chat_history": chat_history,
         }
 
+        # Offline chatbot.
         if mode == "offline":
             try:
                 response = get_ollama_chat_response(
                     user_message,
-                    **common_context
+                    **common_context,
                 )
-            except Exception as error:
-                app.logger.warning(
-                    "Ollama chat request failed: %s",
-                    error,
+            except Exception:
+                app.logger.exception(
+                    "Ollama chat request failed"
                 )
                 return (
-                    "Offline chat could not reach Ollama. Make sure Ollama "
-                    "is running and the qwen2.5:3b model is installed.",
+                    "Offline chat could not reach Ollama. "
+                    "Make sure Ollama is running and the "
+                    "qwen2.5:3b model is installed and accessible.",
                     503,
                 )
+
+        # Online Gemini chatbot.
         else:
             try:
                 response = get_chat_response(
                     user_message,
-                    **common_context
+                    **common_context,
                 )
             except GeminiChatError as error:
+                app.logger.warning(
+                    "Gemini chat request failed: %s",
+                    error,
+                )
                 return str(error), error.status_code
 
+        # Update history only after a successful response.
         chat_history.extend([
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": str(response)},
+            {
+                "role": "user",
+                "content": user_message,
+            },
+            {
+                "role": "assistant",
+                "content": str(response),
+            },
         ])
 
         session["chat_history"] = chat_history[-10:]
@@ -667,24 +670,30 @@ def chat():
 
 @app.route("/download-report", methods=["GET"])
 def download_report():
+    # Get analysis belonging to this browser session.
+    analysis_id = session.get("analysis_id")
+
     with analysis_lock:
-        current_analysis = dict(analysis_data)
+        current_analysis = (
+            dict(analysis_data.get(analysis_id, {}))
+            if analysis_id
+            else {}
+        )
 
     if not current_analysis:
-        return (
-            "No analysis is available. Please analyze a resume first.",
-            400,
-        )
+        return "Please analyze a resume first.", 400
 
     file_path = None
 
     try:
+        # Create a temporary PDF file.
         with tempfile.NamedTemporaryFile(
             delete=False,
-            suffix=".pdf"
+            suffix=".pdf",
         ) as temp_file:
             file_path = temp_file.name
 
+        # Generate the report.
         generate_report(
             file_path,
             current_analysis["similarity_score"],
@@ -710,9 +719,8 @@ def download_report():
         return "Could not generate the PDF report.", 500
 
     finally:
-        # The response may stream the file, so do not remove
-        # it here before Flask has finished sending it.
-        # Temporary files are left for OS/container cleanup.
+        # The response may still be sending the file.
+        # The temporary file is left for OS/container cleanup.
         pass
 
 
@@ -720,18 +728,23 @@ def download_report():
 # METHOD NOT ALLOWED HANDLER
 # =========================================================
 
-
 @app.errorhandler(405)
-def method_not_allowed(_error):
+def method_not_allowed(error):
+    status_code = error.code or 405
+
     if request.path == "/analyze":
         return (
             "The /analyze route requires a POST form submission. "
             "Please return to the homepage, upload a PDF, enter "
             "a job description, and click Analyze Resume.",
-            405,
+            status_code,
         )
 
-    return "The requested HTTP method is not supported.", 405
+    return (
+        "The requested HTTP method is not supported.",
+        status_code,
+    )
+
 
 # =========================================================
 # RUN LOCALLY

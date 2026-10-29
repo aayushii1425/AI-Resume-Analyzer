@@ -67,40 +67,55 @@ def _public_api_error(error):
     )
 
 
+# =========================================================
+# GEMINI CLIENT
+# =========================================================
+
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
 client = None
 
 if API_KEY:
     try:
-        client = genai.Client(
-            api_key=API_KEY,
-            http_options=types.HttpOptions(
-                retry_options=types.HttpRetryOptions(attempts=2)
-            ),
-        )
+       client = genai.Client(
+    api_key=API_KEY,
+    http_options=types.HttpOptions(
+        timeout=12000,
+        retry_options=types.HttpRetryOptions(attempts=1),
+    ),
+)
     except Exception:
         logger.exception("Could not initialize Gemini client")
 
 
-# Use model IDs supported by your Gemini API account.
+# Keep all four configured fallback models.
 MODELS_TO_TRY = [
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemini-2.5-flash",
 ]
+
+
+# =========================================================
+# RESPONSE AND CONTEXT LIMITS
+# =========================================================
 
 MAX_RESUME_CHARS = 3000
 MAX_JOB_CHARS = 1800
 MAX_HISTORY_MESSAGES = 4
 MAX_HISTORY_CHARS = 1000
-MAX_OUTPUT_TOKENS = 220
+
+# Increased from 220 to allow more complete answers.
+MAX_OUTPUT_TOKENS = 400
 
 
 def _short_list(items, limit=8):
     """Format a short list without excessive prompt context."""
-    return ", ".join(str(item) for item in (items or [])[:limit]) or "None"
+    return ", ".join(
+        str(item) for item in (items or [])[:limit]
+    ) or "None"
 
 
 def get_chat_response(
@@ -143,7 +158,10 @@ def get_chat_response(
         role = item.get("role")
         content = item.get("content", "")
 
-        if role not in ("user", "assistant") or not isinstance(content, str):
+        if role not in ("user", "assistant"):
+            continue
+
+        if not isinstance(content, str):
             continue
 
         content = content.strip()[:MAX_HISTORY_CHARS]
@@ -152,19 +170,27 @@ def get_chat_response(
             label = "User" if role == "user" else "ResumeIQ"
             history_lines.append(f"{label}: {content}")
 
-    history_text = "\n".join(history_lines) or "No previous conversation."
+    history_text = (
+        "\n".join(history_lines)
+        or "No previous conversation."
+    )
 
     prompt = f"""
 You are ResumeIQ, an AI resume and career assistant.
 
-RULES:
-- Always answer in clear English.
+RESPONSE RULES:
 - Answer the user's exact question first.
-- Be concise and practical; usually use 3-5 bullet points.
+- Use clear, natural English.
+- For a normal question, provide a complete answer in 3-5 bullet points.
+- Explain technical terms briefly when helpful.
+- Use the supplied analysis and resume details when relevant.
+- Give practical, specific suggestions based on the available information.
 - Never invent skills, qualifications, projects, or achievements.
-- Use the analysis data when relevant.
+- Do not simply repeat the analysis figures without explaining them.
 - An ATS-style score does not guarantee passing a real ATS.
-- If asked for a language other than English, explain that English
+- Finish every answer with a complete sentence.
+- Do not stop mid-sentence or mid-word.
+- If the user asks for a language other than English, explain that English
   is the currently supported response language.
 
 ANALYSIS:
@@ -188,7 +214,8 @@ RECENT CONVERSATION:
 CURRENT QUESTION:
 {str(user_message)[:1500]}
 
-Give a direct, useful answer without repeating all the supplied context.
+Give a direct, complete, useful answer. Do not repeat all the supplied
+context. Use only as much detail as needed to answer the question.
 """.strip()
 
     start_time = time.perf_counter()
@@ -199,27 +226,50 @@ Give a direct, useful answer without repeating all the supplied context.
         try:
             logger.info("Trying Gemini model: %s", model_name)
 
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.3,
-                    max_output_tokens=MAX_OUTPUT_TOKENS,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level="low"
-                    ),
+            generation_config = types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=MAX_OUTPUT_TOKENS,
+                thinking_config=types.ThinkingConfig(
+                    thinking_level="low"
                 ),
+            )
+
+            chat = client.chats.create(model=model_name)
+
+            response = chat.send_message(
+                prompt,
+                config=generation_config,
             )
 
             answer = getattr(response, "text", None)
 
+            # Inspect the finish reason to help diagnose incomplete answers.
+            candidates = getattr(response, "candidates", None) or []
+            finish_reason = None
+
+            if candidates:
+                finish_reason = getattr(
+                    candidates[0],
+                    "finish_reason",
+                    None,
+                )
+
+            logger.info(
+                "Gemini model %s finish reason: %s",
+                model_name,
+                finish_reason,
+            )
+
             if answer and answer.strip():
+                answer = answer.strip()
+
                 logger.info(
                     "Gemini response generated using %s in %.2f seconds",
                     model_name,
                     time.perf_counter() - start_time,
                 )
-                return answer.strip()
+
+                return answer
 
             logger.warning(
                 "Model %s returned an empty response; trying next model",
@@ -235,18 +285,24 @@ Give a direct, useful answer without repeating all the supplied context.
                 error.code,
                 error.status,
             )
+
             last_api_error = error
 
-            if error.code in (401, 403) or error.status == "PERMISSION_DENIED":
+            if (
+                error.code in (401, 403)
+                or error.status == "PERMISSION_DENIED"
+            ):
                 raise _public_api_error(error) from error
 
-            if error.code == 404 or error.status == "NOT_FOUND":
-                continue
-
+            # Try the next model for model-specific or temporary failures.
             if (
-                error.code in (429, 503, 504)
+                error.code == 404
+                or error.status == "NOT_FOUND"
+                or error.code == 429
+                or error.status == "RESOURCE_EXHAUSTED"
+                or error.code in (500, 503, 504)
                 or error.status in (
-                    "RESOURCE_EXHAUSTED",
+                    "INTERNAL",
                     "UNAVAILABLE",
                     "DEADLINE_EXCEEDED",
                 )
