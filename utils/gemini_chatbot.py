@@ -77,24 +77,25 @@ client = None
 
 if API_KEY:
     try:
-       client = genai.Client(
-    api_key=API_KEY,
-    http_options=types.HttpOptions(
-        timeout=12000,
-        retry_options=types.HttpRetryOptions(attempts=1),
-    ),
-)
+        client = genai.Client(
+            api_key=API_KEY,
+            http_options=types.HttpOptions(
+                timeout=12000,
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        )
     except Exception:
         logger.exception("Could not initialize Gemini client")
 
 
 # Keep all four configured fallback models.
 MODELS_TO_TRY = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+     "gemini-2.5-flash",
+     "gemini-3.5-flash-lite",
+     "gemini-3.5-flash",
+     "gemini-3.7-flash",
+     "gemini-3.8-flash",
 ]
 
 
@@ -108,7 +109,7 @@ MAX_HISTORY_MESSAGES = 4
 MAX_HISTORY_CHARS = 1000
 
 # Increased from 220 to allow more complete answers.
-MAX_OUTPUT_TOKENS = 400
+MAX_OUTPUT_TOKENS = 1000
 
 
 def _short_list(items, limit=8):
@@ -263,6 +264,16 @@ context. Use only as much detail as needed to answer the question.
             if answer and answer.strip():
                 answer = answer.strip()
 
+                finish_reason_text = str(finish_reason).upper()
+
+                if "MAX_TOKENS" in finish_reason_text:
+                    logger.warning(
+                        "Model %s reached the output token limit.",
+                        model_name,
+                    )
+                    saw_empty_response = True
+                    continue
+
                 logger.info(
                     "Gemini response generated using %s in %.2f seconds",
                     model_name,
@@ -270,6 +281,7 @@ context. Use only as much detail as needed to answer the question.
                 )
 
                 return answer
+
 
             logger.warning(
                 "Model %s returned an empty response; trying next model",
